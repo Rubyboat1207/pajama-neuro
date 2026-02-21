@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+pub(crate) mod neuro_sdk;
 pub(crate) mod game;
 
 use std::ptr::null_mut;
@@ -11,7 +12,7 @@ use windows_sys::Win32::Storage::FileSystem::{CreateFileA, OPEN_EXISTING, FILE_S
 use windows_sys::Win32::System::Console::SetStdHandle;
 use windows_sys::Win32::System::Console::{STD_OUTPUT_HANDLE, STD_ERROR_HANDLE, STD_INPUT_HANDLE};
 
-use crate::game::init_game;
+use crate::neuro_sdk::init_game;
 
 #[unsafe(no_mangle)]
 pub extern "system" fn DllMain(_: *const (), reason: u32, _: *const ()) -> i32 {

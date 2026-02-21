@@ -1,105 +1,31 @@
-use std::{sync::Arc, time::Duration};
+use std::ptr;
 
-use futures_util::{SinkExt, StreamExt};
-use neuro_sama::game::Api;
-use schemars::JsonSchema;
-use serde::Deserialize;
-use tokio::sync::mpsc;
+use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 
-struct TestGame(mpsc::UnboundedSender<tungstenite::Message>);
-
-#[allow(unused)]
-#[derive(Debug, Deserialize, JsonSchema)]
-struct TestAction {
-    message: String
-}
-
-#[derive(Debug, neuro_sama::derive::Actions)]
-enum Action {
-    /// Action 1 description
-    #[name = "action1"]
-    TestAction(TestAction),
-}
-
-impl neuro_sama::game::Game for TestGame {
-    const NAME: &'static str = "Test Game";
-    type Actions<'a> = Action;
-    fn send_command(&self, message: tungstenite::Message) {
-        let _ = self.0.send(message);
+pub unsafe fn get_current_room_id() -> Option<i32> {
+    // 1. Get the base address of the main executable (scummvm.exe)
+    let module_handle = unsafe { GetModuleHandleW(ptr::null()) };
+    if module_handle.is_null() {
+        return None;
     }
-    fn reregister_actions(&self) {
-        // your game could have some complicated logic here i guess
-        self.register_actions::<Action>().unwrap();
-    }
-    fn handle_action<'a>(
-        &self,
-        action: Self::Actions<'a>,
-    ) -> Result<
-        Option<impl 'static + Into<std::borrow::Cow<'static, str>>>,
-        Option<impl 'static + Into<std::borrow::Cow<'static, str>>>,
-    > {
-        match action {
-            Action::TestAction(ta) => {
-                println!("{}", ta.message);
-                Ok::<_, Option<&str>>(Some("Ok"))
-            }
-        }
-    }
-}
+    let base_address = module_handle as usize;
 
-#[tokio::main(flavor = "current_thread")]
-pub async fn init_game() {
-    let (game2ws_tx, mut game2ws_rx) = mpsc::unbounded_channel();
-    let game = Arc::new(TestGame(game2ws_tx));
-    game.initialize().unwrap();
-    let game1 = game.clone();
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(Duration::from_secs(20)).await;
-            game1
-                .force_actions::<Action>("do your thing".into())
-                .with_state("some state idk")
-                .send()
-                .unwrap();
-        }
-    });
-    let mut ws =
-        tokio_tungstenite::connect_async(if let Ok(url) = std::env::var("NEURO_SDK_WS_URL") {
-            url
-        } else {
-            "ws://127.0.0.1:8000".to_owned()
-        })
-        .await
-        .unwrap()
-        .0;
-    loop {
-        tokio::select! {
-            msg = game2ws_rx.recv() => {
-                println!("game2ws {msg:?}");
-                let Some(msg) = msg else {
-                    break;
-                };
-                if ws.send(msg).await.is_err() {
-                    println!("websocket send failed");
-                    break;
-                }
-            }
-            msg = ws.next() => {
-                println!("ws2game {msg:?}");
-                let Some(msg) = msg else {
-                    break;
-                };
-                let Ok(msg) = msg else {
-                    continue;
-                };
-                if let Err(err) = game.handle_message(msg) {
-                    // this could happen because we don't know what this message means (e.g. added
-                    // in a new version of the API)
-                    println!("notify_message failed: {err}");
-                    continue;
-                }
-            }
+    // 2. Navigate to the static engine pointer
+    let static_offset = 0x2756030;
+    let engine_ptr_loc = (base_address + static_offset) as *const usize;
+    
+    // 3. Dereference it to get the dynamic engine base (EBP from your debugger)
+    // We use read_volatile so the compiler doesn't optimize this read away
+    let engine_base = unsafe { ptr::read_volatile(engine_ptr_loc) };
 
-        }
+    // 4. If the pointer is 0, the game hasn't allocated the engine yet (e.g., main menu)
+    if engine_base == 0 {
+        return None;
     }
+
+    // 5. Add the struct offset and read the actual room ID
+    let room_id_offset = 0x48B4;
+    let room_id_ptr = (engine_base + room_id_offset) as *const i32;
+    
+    Some(unsafe { ptr::read_volatile(room_id_ptr) })
 }

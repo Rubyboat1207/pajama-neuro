@@ -14,7 +14,11 @@ fn main() {
     if Path::new("SDL2.dll").exists() {
         // Use lib.exe to generate an import library from the DLL
         // lib.exe should be in the same directory as link.exe (MSVC toolchain)
-        let lib_exe = r"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\bin\HostX64\x86\lib.exe";
+        let lib_exe = if env::var("GITHUB_ACTIONS").is_ok() {
+            "lib.exe"
+        } else {
+            r"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\bin\HostX64\x86\lib.exe"
+        };
         
         let status = Command::new(lib_exe)
             .args(&[

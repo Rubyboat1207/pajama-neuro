@@ -1,0 +1,42 @@
+name: Build and Package
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        targets: i686-pc-windows-msvc
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x86
+
+    - name: Build
+      run: cargo build --release --target i686-pc-windows-msvc
+
+    - name: Package
+      run: |
+        mkdir dist
+        cp SDL2.dll dist/SDL2_orig.dll
+        cp target/i686-pc-windows-msvc/release/SDL2.dll dist/SDL2.dll
+        compress-archive -Path dist/* -DestinationPath pajama-neuro.zip
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: pajama-neuro
+        path: pajama-neuro.zip

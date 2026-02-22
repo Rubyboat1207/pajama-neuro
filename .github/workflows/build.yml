@@ -32,7 +32,8 @@ jobs:
         mkdir dist
         cp SDL2.dll dist/SDL2_orig.dll
         cp target/i686-pc-windows-msvc/release/SDL2.dll dist/SDL2.dll
-        compress-archive -Path dist/* -DestinationPath pajama-neuro.zip
+        cd dist
+        compress-archive -Path * -DestinationPath ../pajama-neuro.zip
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4

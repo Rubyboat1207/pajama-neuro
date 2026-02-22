@@ -1,14 +1,13 @@
-use std::{sync::Arc, time::Duration};
-
+use std::{sync::{Arc, Mutex, OnceLock}, time::Duration};
 use futures_util::{SinkExt, StreamExt};
 use neuro_sama::game::Api;
 use schemars::JsonSchema;
 use serde::Deserialize;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc};
 
-use crate::game::get_current_room_id;
+use crate::game::ScummEngine;
 
-struct TestGame(mpsc::UnboundedSender<tungstenite::Message>);
+struct PajamaSam(mpsc::UnboundedSender<tungstenite::Message>);
 
 #[allow(unused)]
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -26,20 +25,55 @@ enum Action {
     #[name = "action1"]
     TestAction(TestAction),
     /// Get Room ID
-    #[name = "getroomid"]
+    #[name = "get_room_id"]
     GetRoomId(GetRoomId)
 }
 
-impl neuro_sama::game::Game for TestGame {
+static LAST_ROOM_ID: OnceLock<Arc<Mutex<i32>>> = OnceLock::new();
+
+fn check_room_update() -> Option<i32> {
+    let room_id = unsafe { ScummEngine::get().unwrap().get_current_room_id() };
+    let data = LAST_ROOM_ID.get_or_init(|| Arc::new(Mutex::new(-1)));
+    let mut value = data.lock().unwrap();
+    
+    if room_id != *value {
+        *value = room_id;
+        Some(room_id) // Return the new ID
+    } else {
+        None
+    }
+}
+
+fn send_context_if_room_updated(game: &PajamaSam) {
+    let _ = match check_room_update() {
+        Some(new_id) => game.context(format!("You've moved into {}", get_room_name(new_id)), false),
+        None => return,
+    };
+}
+
+static ROOMS: &'static [&str] = &[
+    "The Loading Screen",
+    "The Intro",
+    "Sam's Room"
+];
+
+fn get_room_name(id: i32) -> String {
+    ROOMS[id as usize].to_string()
+}
+
+impl neuro_sama::game::Game for PajamaSam {
     const NAME: &'static str = "Pajama Sam";
     type Actions<'a> = Action;
     fn send_command(&self, message: tungstenite::Message) {
         let _ = self.0.send(message);
     }
+
+
     fn reregister_actions(&self) {
-        // your game could have some complicated logic here i guess
         self.register_actions::<Action>().unwrap();
     }
+
+
     fn handle_action<'a>(
         &self,
         action: Self::Actions<'a>,
@@ -47,12 +81,31 @@ impl neuro_sama::game::Game for TestGame {
         Option<impl 'static + Into<std::borrow::Cow<'static, str>>>,
         Option<impl 'static + Into<std::borrow::Cow<'static, str>>>,
     > {
+        let engine = unsafe { ScummEngine::get().unwrap() };
+        send_context_if_room_updated(self);
+
         match action {
             Action::TestAction(ta) => {
-                println!("{}", ta.message);
-                Ok::<_, Option<String>>(Some("Ok".to_string()))
+                let mut ids: Vec<u8> = vec![];
+                let actor_count = unsafe { engine.get_num_actors() };
+
+                println!("Saw {} actors", actor_count);
+
+                for i in 0..actor_count {
+                    match unsafe { engine.get_actor(i.into()) } {
+                        Some(actor) => {
+                            println!("Actor at {} found", i);
+                            let id = unsafe { actor.get_id() };
+                            println!("Actor at {} has id {}", i, id);
+                            ids.push(id)
+                        },
+                        None => continue,
+                    }
+                }
+
+                Ok(Some(format!("{:?}", ids)))
             },
-            Action::GetRoomId(_) => Ok::<_, Option<String>>(Some(unsafe { get_current_room_id().unwrap_or(-1).to_string() }))
+            Action::GetRoomId(_) => Ok::<_, Option<String>>(Some(unsafe { engine.get_current_room_id() }.to_string()))
         }
     }
 }
@@ -60,7 +113,7 @@ impl neuro_sama::game::Game for TestGame {
 #[tokio::main(flavor = "current_thread")]
 pub async fn init_game() {
     let (game2ws_tx, mut game2ws_rx) = mpsc::unbounded_channel();
-    let game = Arc::new(TestGame(game2ws_tx));
+    let game = Arc::new(PajamaSam(game2ws_tx));
     game.initialize().unwrap();
 
     let mut ws =
@@ -72,8 +125,17 @@ pub async fn init_game() {
         .await
         .unwrap()
         .0;
-
     
+    // is there a better way of doing this?
+    let game2 = game.clone();
+
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            send_context_if_room_updated(&game2);
+        }
+    });
+
     loop {
         tokio::select! {
             msg = game2ws_rx.recv() => {

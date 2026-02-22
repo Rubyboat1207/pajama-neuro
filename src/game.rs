@@ -77,6 +77,8 @@ impl ScummEngine {
         }
     }
 
+    // maybe this should be marked unsafe, but to me I don't think this would ever cause unsafe accesses under normal circumstances.
+    // This list can be larger than 256, but pajama never uses that many anyways I think.
     pub fn get_room_object(&self, num: usize) -> Option<ObjectData> {
         for i in 1..256 {
             match unsafe { self.get_room_object_at(i) } {
@@ -88,11 +90,12 @@ impl ScummEngine {
         None
     }
 
+    #[allow(unused)]
     pub unsafe fn print_all_objects(&self) {
         // Note: You can also map _numLocalObjects to stop the loop dynamically,
         // but checking until obj_nr == 0 or a hard cap of ~100 usually works.
         for i in 1..100 {
-            if let Some(obj) = unsafe { self.get_room_object(i) } {
+            if let Some(obj) = self.get_room_object(i) {
                 let obj_nr = obj.obj_nr;
                 let x_pos = obj.x_pos;
                 let y_pos = obj.y_pos;
@@ -107,16 +110,18 @@ impl ScummEngine {
         }
     }
 
-    pub unsafe fn get_current_room_id(&self) -> i32 {
+    pub fn get_current_room_id(&self) -> i32 {
         let room_id_ptr = (self.base_address + ROOM_INDEX_OFFSET) as *const i32;
         unsafe { ptr::read_unaligned(room_id_ptr) }
     }
 
+    #[allow(unused)]
     pub unsafe fn get_num_actors(&self) -> u8 {
         let num_actors_ptr = (self.base_address + NUM_ACTORS_OFFSET) as *const u8;
         unsafe { ptr::read_unaligned(num_actors_ptr) }
     }
 
+    #[allow(unused)]
     pub unsafe fn get_actor(&self, index: usize) -> Option<Actor> {
         unsafe {
             let max_actors = self.get_num_actors() as usize;
@@ -216,7 +221,7 @@ impl Actor {
 
 impl ObjectData {
     /// Simulates an SDL mouse click at the exact center of this object's hitbox.
-    pub unsafe fn click(&self) {
+    pub fn click(&self) {
         // 1. Calculate the center of the hitbox
         let center_x = (self.x_pos + (self.width as i16 / 2)) as i32;
         let center_y = (self.y_pos + (self.height as i16 / 2)) as i32;

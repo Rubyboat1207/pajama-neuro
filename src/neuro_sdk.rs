@@ -1,11 +1,14 @@
-use std::{sync::{Arc, Mutex, OnceLock}, time::Duration};
 use futures_util::{SinkExt, StreamExt};
 use neuro_sama::game::Api;
 use schemars::JsonSchema;
 use serde::Deserialize;
-use tokio::sync::{mpsc};
+use std::{
+    sync::{Arc, Mutex, OnceLock},
+    time::Duration,
+};
+use tokio::sync::mpsc;
 
-use crate::game::ScummEngine;
+use crate::{game::ScummEngine, rooms::get_room_at};
 
 struct PajamaSam(mpsc::UnboundedSender<tungstenite::Message>);
 
@@ -15,7 +18,7 @@ struct TestAction;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct ClickObject {
-    objectId: usize
+    objectId: usize,
 }
 
 #[allow(unused)]
@@ -24,15 +27,12 @@ struct GetRoomId;
 
 #[derive(Debug, neuro_sama::derive::Actions)]
 enum Action {
-    /// Action 1 description
-    #[name = "action1"]
-    TestAction(TestAction),
     /// Get Room ID
     #[name = "get_room_id"]
     GetRoomId(GetRoomId),
     /// Clicks an object by ID
     #[name = "click_object"]
-    ClickObject(ClickObject)
+    ClickObject(ClickObject),
 }
 
 static LAST_ROOM_ID: OnceLock<Arc<Mutex<i32>>> = OnceLock::new();
@@ -41,7 +41,7 @@ fn check_room_update() -> Option<i32> {
     let room_id = unsafe { ScummEngine::get().unwrap().get_current_room_id() };
     let data = LAST_ROOM_ID.get_or_init(|| Arc::new(Mutex::new(-1)));
     let mut value = data.lock().unwrap();
-    
+
     if room_id != *value {
         *value = room_id;
         Some(room_id) // Return the new ID
@@ -50,21 +50,51 @@ fn check_room_update() -> Option<i32> {
     }
 }
 
+enum GetRoomContentsErr {
+    EngineNotYetLoaded,
+    RoomNotFound,
+}
+
+fn get_room_contents() -> Result<String, GetRoomContentsErr> {
+    let mut readout = "".to_string();
+    let engine = unsafe { ScummEngine::get() }.ok_or(GetRoomContentsErr::EngineNotYetLoaded)?;
+
+    for object in get_room_at(engine.get_current_room_id())
+        .ok_or(GetRoomContentsErr::RoomNotFound)?
+        .objects
+    {
+        readout += &format!("{} which as an ID of {}", object.name, object.id);
+    }
+
+    Ok(readout)
+}
+
 fn send_context_if_room_updated(game: &PajamaSam) {
     let _ = match check_room_update() {
-        Some(new_id) => game.context(format!("You've moved into {}", get_room_name(new_id)), false),
+        Some(new_id) => game.context(
+            format!(
+                "You've moved into {}. {} Inside this room are the following:\n {}",
+                get_room_name(new_id),
+                match get_room_at(new_id) {
+                    Some(room) => (room.on_entered)(),
+                    None => "".to_string(),
+                },
+                get_room_contents().unwrap_or("Its empty or unmapped.".to_string())
+            ),
+            false,
+        ),
         None => return,
     };
 }
 
-static ROOMS: &'static [&str] = &[
-    "The Loading Screen",
-    "The Intro",
-    "Sam's Room"
-];
-
 fn get_room_name(id: i32) -> String {
-    ROOMS[id as usize].to_string()
+    match get_room_at(id) {
+        Some(room) => room.name.to_string(),
+        None => format!(
+            "An unknown room with ID {}. Someone tell Rubyboat there's a problem with their mod.",
+            id
+        ),
+    }
 }
 
 impl neuro_sama::game::Game for PajamaSam {
@@ -74,11 +104,9 @@ impl neuro_sama::game::Game for PajamaSam {
         let _ = self.0.send(message);
     }
 
-
     fn reregister_actions(&self) {
         self.register_actions::<Action>().unwrap();
     }
-
 
     fn handle_action<'a>(
         &self,
@@ -91,36 +119,26 @@ impl neuro_sama::game::Game for PajamaSam {
         send_context_if_room_updated(self);
 
         match action {
-            Action::TestAction(_) => {
-                let mut ids: Vec<u8> = vec![];
-                let actor_count = unsafe { engine.get_num_actors() };
-
-                println!("Saw {} actors", actor_count);
-
-                for i in 0..actor_count {
-                    match unsafe { engine.get_actor(i.into()) } {
-                        Some(actor) => {
-                            println!("Actor at {} found", i);
-                            let id = unsafe { actor.get_id() };
-                            println!("Actor at {} has id {}", i, id);
-                            ids.push(id)
-                        },
-                        None => continue,
-                    }
-                }
-
-                unsafe { engine.print_all_objects() };
-
-                Ok(Some(format!("{:?}", ids)))
-            },
-            Action::GetRoomId(_) => Ok::<_, Option<String>>(Some(unsafe { engine.get_current_room_id() }.to_string())),
+            Action::GetRoomId(_) => {
+                Ok::<_, Option<String>>(Some(engine.get_current_room_id().to_string()))
+            }
             Action::ClickObject(object) => {
-                match unsafe { engine.get_room_object(object.objectId) } {
-                    Some(obj) => {
-                        unsafe { obj.click() };
-                        Ok(Some("yay clicked!".to_string()))
-                    },
-                    None => Ok(Some("Wrong Object ID".to_string())),
+                let objectData = engine.get_room_object(object.objectId)
+                    .ok_or(Some("Invalid Object".to_string()))?;
+
+                let object_description = get_room_at(engine.get_current_room_id())
+                    .ok_or(Some("This room has not been mapped yet.".to_string()))?
+                    .get_object(object.objectId as i32)
+                    .ok_or(Some(
+                        "Object has not been mapped yet or is not intended to be selected"
+                            .to_string(),
+                    ))?;
+
+                objectData.click();
+
+                match (object_description.on_clicked)() {
+                    Ok(val) => Ok(Some(val)),
+                    Err(val) => Err(Some(val)),
                 }
             }
         }
@@ -142,7 +160,7 @@ pub async fn init_game() {
         .await
         .unwrap()
         .0;
-    
+
     // is there a better way of doing this?
     let game2 = game.clone();
 

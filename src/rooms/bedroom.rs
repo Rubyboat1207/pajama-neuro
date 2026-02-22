@@ -1,108 +1,154 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BedroomObjects {
-    ClosetDoor = 66,
-    UnderSamsBed = 67,
-    Pot = 68,
-    TopNightstandDrawer = 69,
-    BottomNightstandDrawer = 70,
-    PurpleScarfBedpost = 72,
-    Door = 73,
-    PajamaSam = 74,
-    TopLeftBedKnob = 75,
-    TopRightBedKnob = 76,
-    BottomRightBedKnob = 77,
-    BottomLeftBedKnob = 78,
-    BooksOnShelf = 79,
-    PaperNailedToDoor = 80,
-    Poster = 81,
-    CeilingLightFixture = 82,
-    WallPosterPajamaMan = 83,
-    ToyAirplane = 84,
-    SamStStreetSign = 85,
-    PajamaManNightLight = 86,
-    HangingBaseballGlove = 87,
-    HangingBaseballCap = 88,
-    LampShade = 89,
-    Calendar = 90,
-    ToyTruck = 91,
-    OnTopOfTheBed = 93,
-    Pillow = 94,
-    ComicBook = 95,
-    ClosetDoorLeft = 97,
-}
+use crate::rooms::{ObjectDescription, RoomDescription};
 
-impl BedroomObjects {
-    #[allow(unused)]
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            BedroomObjects::ClosetDoor => "Closet Door",
-            BedroomObjects::UnderSamsBed => "Under Sam's Bed",
-            BedroomObjects::Pot => "Pot",
-            BedroomObjects::TopNightstandDrawer => "Top Nightstand Drawer",
-            BedroomObjects::BottomNightstandDrawer => "Bottom Nightstand Drawer",
-            BedroomObjects::PurpleScarfBedpost => "Purple Scarf / Bedpost",
-            BedroomObjects::Door => "Door",
-            BedroomObjects::PajamaSam => "Pajama Sam",
-            BedroomObjects::TopLeftBedKnob => "Top left bed Knob",
-            BedroomObjects::TopRightBedKnob => "Top right bed Knob",
-            BedroomObjects::BottomRightBedKnob => "Bottom right Bed Knob",
-            BedroomObjects::BottomLeftBedKnob => "Bottom Left Bed Knob",
-            BedroomObjects::BooksOnShelf => "Books On Shelf",
-            BedroomObjects::PaperNailedToDoor => "Paper Nailed To Door",
-            BedroomObjects::Poster => "Poster",
-            BedroomObjects::CeilingLightFixture => "Ceiling Light Fixture",
-            BedroomObjects::WallPosterPajamaMan => "Wall Poster (Pajama Man)",
-            BedroomObjects::ToyAirplane => "Toy Airplane",
-            BedroomObjects::SamStStreetSign => "SAM ST Street Sign",
-            BedroomObjects::PajamaManNightLight => "Pajama Man Night Light",
-            BedroomObjects::HangingBaseballGlove => "Hanging Baseball Glove",
-            BedroomObjects::HangingBaseballCap => "Hanging Baseball Cap",
-            BedroomObjects::LampShade => "Lamp Shade",
-            BedroomObjects::Calendar => "Calendar",
-            BedroomObjects::ToyTruck => "Toy Truck",
-            BedroomObjects::OnTopOfTheBed => "On top of the bed",
-            BedroomObjects::Pillow => "Pillow",
-            BedroomObjects::ComicBook => "Comic Book",
-            BedroomObjects::ClosetDoorLeft => "Closet Door (Left)",
-        }
-    }
-}
-
-impl TryFrom<u16> for BedroomObjects {
-    type Error = ();
-
-    fn try_from(v: u16) -> Result<Self, Self::Error> {
-        match v {
-            66 => Ok(BedroomObjects::ClosetDoor),
-            67 => Ok(BedroomObjects::UnderSamsBed),
-            68 => Ok(BedroomObjects::Pot),
-            69 => Ok(BedroomObjects::TopNightstandDrawer),
-            70 => Ok(BedroomObjects::BottomNightstandDrawer),
-            72 => Ok(BedroomObjects::PurpleScarfBedpost),
-            73 => Ok(BedroomObjects::Door),
-            74 => Ok(BedroomObjects::PajamaSam),
-            75 => Ok(BedroomObjects::TopLeftBedKnob),
-            76 => Ok(BedroomObjects::TopRightBedKnob),
-            77 => Ok(BedroomObjects::BottomRightBedKnob),
-            78 => Ok(BedroomObjects::BottomLeftBedKnob),
-            79 => Ok(BedroomObjects::BooksOnShelf),
-            80 => Ok(BedroomObjects::PaperNailedToDoor),
-            81 => Ok(BedroomObjects::Poster),
-            82 => Ok(BedroomObjects::CeilingLightFixture),
-            83 => Ok(BedroomObjects::WallPosterPajamaMan),
-            84 => Ok(BedroomObjects::ToyAirplane),
-            85 => Ok(BedroomObjects::SamStStreetSign),
-            86 => Ok(BedroomObjects::PajamaManNightLight),
-            87 => Ok(BedroomObjects::HangingBaseballGlove),
-            88 => Ok(BedroomObjects::HangingBaseballCap),
-            89 => Ok(BedroomObjects::LampShade),
-            90 => Ok(BedroomObjects::Calendar),
-            91 => Ok(BedroomObjects::ToyTruck),
-            93 => Ok(BedroomObjects::OnTopOfTheBed),
-            94 => Ok(BedroomObjects::Pillow),
-            95 => Ok(BedroomObjects::ComicBook),
-            97 => Ok(BedroomObjects::ClosetDoorLeft),
-            _ => Err(()),
-        }
-    }
-}
+pub(crate) const BEDROOM_DESCRIPTION: RoomDescription = RoomDescription {
+    id: 2,
+    name: "Sam's Bedroom",
+    on_entered: || "".to_string(),
+    objects: &[
+        ObjectDescription {
+            id: 66,
+            name: "Closet Door",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 67,
+            name: "Under Sam's Bed",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 68,
+            name: "Pot",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 69,
+            name: "Top Nightstand Drawer",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 70,
+            name: "Bottom Nightstand Drawer",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 72,
+            name: "Purple Scarf / Bedpost",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 73,
+            name: "Door",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 74,
+            name: "Pajama Sam",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 75,
+            name: "Top left bed Knob",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 76,
+            name: "Top right bed Knob",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 77,
+            name: "Bottom right Bed Knob",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 78,
+            name: "Bottom Left Bed Knob",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 79,
+            name: "Books On Shelf",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 80,
+            name: "Paper Nailed To Door",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 81,
+            name: "Poster",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 82,
+            name: "Ceiling Light Fixture",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 83,
+            name: "Wall Poster (Pajama Man)",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 84,
+            name: "Toy Airplane",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 85,
+            name: "SAM ST Street Sign",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 86,
+            name: "Pajama Man Night Light",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 87,
+            name: "Hanging Baseball Glove",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 88,
+            name: "Hanging Baseball Cap",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 89,
+            name: "Lamp Shade",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 90,
+            name: "Calendar",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 91,
+            name: "Toy Truck",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 93,
+            name: "On top of the bed",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 94,
+            name: "Pillow",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 95,
+            name: "Comic Book",
+            on_clicked: || Ok("".to_string()),
+        },
+        ObjectDescription {
+            id: 97,
+            name: "Closet Door (Left)",
+            on_clicked: || Ok("".to_string()),
+        },
+    ],
+};

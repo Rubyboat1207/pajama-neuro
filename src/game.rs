@@ -57,29 +57,42 @@ impl ScummEngine {
         }
     }
 
-    pub unsafe fn get_room_object(&self, index: usize) -> Option<ObjectData> {
-        let objs_array_ptr_loc = (self.base_address + OBJS_OFFSET) as *const usize;
-        let objs_array_base = ptr::read_unaligned(objs_array_ptr_loc);
+    pub unsafe fn get_room_object_at(&self, index: usize) -> Option<ObjectData> {
+        unsafe {
+            let objs_array_ptr_loc = (self.base_address + OBJS_OFFSET) as *const usize;
+            let objs_array_base = ptr::read_unaligned(objs_array_ptr_loc);
 
-        if objs_array_base == 0 {
-            return None;
+            if objs_array_base == 0 {
+                return None;
+            }
+
+            let obj_ptr = (objs_array_base as *const ObjectData).add(index);
+            let obj_data = ptr::read_unaligned(obj_ptr);
+
+            if obj_data.obj_nr == 0 {
+                return None;
+            }
+
+            Some(obj_data)
+        }
+    }
+
+    pub fn get_room_object(&self, num: usize) -> Option<ObjectData> {
+        for i in 1..256 {
+            match unsafe { self.get_room_object_at(i) } {
+                Some(obj) if obj.obj_nr as usize == num => return Some(obj),
+                _ => continue,
+            }
         }
 
-        let obj_ptr = (objs_array_base as *const ObjectData).add(index);
-        let obj_data = ptr::read_unaligned(obj_ptr);
-
-        if obj_data.obj_nr == 0 {
-            return None;
-        }
-
-        Some(obj_data)
+        None
     }
 
     pub unsafe fn print_all_objects(&self) {
         // Note: You can also map _numLocalObjects to stop the loop dynamically,
         // but checking until obj_nr == 0 or a hard cap of ~100 usually works.
         for i in 1..100 {
-            if let Some(obj) = self.get_room_object(i) {
+            if let Some(obj) = unsafe { self.get_room_object(i) } {
                 let obj_nr = obj.obj_nr;
                 let x_pos = obj.x_pos;
                 let y_pos = obj.y_pos;
@@ -132,14 +145,18 @@ impl ScummEngine {
     }
 }
 
-use std::ffi::CStr;
+use crate::sdl::{
+    SDL_BUTTON_LEFT, SDL_Event, SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP, SDL_MouseButtonEvent,
+    SDL_PRESSED, SDL_PushEvent, SDL_RELEASED,
+};
 
-type GetActorNameFn = unsafe extern "thiscall" fn(this: usize) -> *const i8;
+// type GetActorNameFn = unsafe extern "thiscall" fn(this: usize) -> *const i8;
 
 pub struct Actor {
     address: usize,
 }
 
+#[allow(unused)]
 impl Actor {
     pub unsafe fn get_position(&self) -> (u16, u16) {
         let x_ptr = (self.address + ACTOR_X_OFFSET) as *const u16;
@@ -194,5 +211,62 @@ impl Actor {
     pub unsafe fn get_id(&self) -> u8 {
         let id_ptr = (self.address + 0x18) as *const u8;
         unsafe { ptr::read_unaligned(id_ptr) }
+    }
+}
+
+impl ObjectData {
+    /// Simulates an SDL mouse click at the exact center of this object's hitbox.
+    pub unsafe fn click(&self) {
+        // 1. Calculate the center of the hitbox
+        let center_x = (self.x_pos + (self.width as i16 / 2)) as i32;
+        let center_y = (self.y_pos + (self.height as i16 / 2)) as i32;
+        let obj_nr = self.obj_nr;
+
+        println!(
+            "Simulating click on Object {} at X:{}, Y:{}",
+            obj_nr, center_x, center_y
+        );
+
+        // 2. Teleport the mouse to the object (Mouse Motion)
+        // (Optional, but helps update any hover states in the engine before the click)
+        // You would construct an SDL_MouseMotionEvent here if needed.
+
+        // 3. Construct the Mouse Down event
+        let mut mouse_down = SDL_Event {
+            button: SDL_MouseButtonEvent {
+                type_: SDL_MOUSEBUTTONDOWN,
+                timestamp: 0, // SDL usually handles 0 fine, or use SDL_GetTicks()
+                windowID: 0,  // Target the main window
+                which: 0,     // Touch device ID (0 is mouse)
+                button: SDL_BUTTON_LEFT,
+                state: SDL_PRESSED,
+                clicks: 1,
+                padding1: 0,
+                x: center_x,
+                y: center_y,
+            },
+        };
+
+        // 4. Construct the Mouse Up event
+        let mut mouse_up = SDL_Event {
+            button: SDL_MouseButtonEvent {
+                type_: SDL_MOUSEBUTTONUP,
+                timestamp: 0,
+                windowID: 0,
+                which: 0,
+                button: SDL_BUTTON_LEFT,
+                state: SDL_RELEASED,
+                clicks: 1,
+                padding1: 0,
+                x: center_x,
+                y: center_y,
+            },
+        };
+
+        // 5. Inject the events into the queue
+        unsafe {
+            SDL_PushEvent(&mut mouse_down);
+            SDL_PushEvent(&mut mouse_up);
+        }
     }
 }

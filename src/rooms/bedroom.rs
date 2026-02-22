@@ -32,6 +32,7 @@ pub enum BedroomObjects {
 }
 
 impl BedroomObjects {
+    #[allow(unused)]
     pub fn as_str(&self) -> &'static str {
         match self {
             BedroomObjects::ClosetDoor => "Closet Door",

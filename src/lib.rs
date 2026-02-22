@@ -2,6 +2,7 @@
 pub(crate) mod neuro_sdk;
 pub(crate) mod game;
 pub(crate) mod rooms;
+pub(crate) mod sdl;
 
 use std::ptr::null_mut;
 use std::time::Duration;

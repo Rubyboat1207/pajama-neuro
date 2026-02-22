@@ -11,8 +11,11 @@ struct PajamaSam(mpsc::UnboundedSender<tungstenite::Message>);
 
 #[allow(unused)]
 #[derive(Debug, Deserialize, JsonSchema)]
-struct TestAction {
-    message: String
+struct TestAction;
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct ClickObject {
+    objectId: usize
 }
 
 #[allow(unused)]
@@ -26,7 +29,10 @@ enum Action {
     TestAction(TestAction),
     /// Get Room ID
     #[name = "get_room_id"]
-    GetRoomId(GetRoomId)
+    GetRoomId(GetRoomId),
+    /// Clicks an object by ID
+    #[name = "click_object"]
+    ClickObject(ClickObject)
 }
 
 static LAST_ROOM_ID: OnceLock<Arc<Mutex<i32>>> = OnceLock::new();
@@ -85,7 +91,7 @@ impl neuro_sama::game::Game for PajamaSam {
         send_context_if_room_updated(self);
 
         match action {
-            Action::TestAction(ta) => {
+            Action::TestAction(_) => {
                 let mut ids: Vec<u8> = vec![];
                 let actor_count = unsafe { engine.get_num_actors() };
 
@@ -103,9 +109,20 @@ impl neuro_sama::game::Game for PajamaSam {
                     }
                 }
 
+                unsafe { engine.print_all_objects() };
+
                 Ok(Some(format!("{:?}", ids)))
             },
-            Action::GetRoomId(_) => Ok::<_, Option<String>>(Some(unsafe { engine.get_current_room_id() }.to_string()))
+            Action::GetRoomId(_) => Ok::<_, Option<String>>(Some(unsafe { engine.get_current_room_id() }.to_string())),
+            Action::ClickObject(object) => {
+                match unsafe { engine.get_room_object(object.objectId) } {
+                    Some(obj) => {
+                        unsafe { obj.click() };
+                        Ok(Some("yay clicked!".to_string()))
+                    },
+                    None => Ok(Some("Wrong Object ID".to_string())),
+                }
+            }
         }
     }
 }

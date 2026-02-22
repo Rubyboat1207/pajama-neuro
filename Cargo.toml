@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 futures-util = "0.3.32"
-neuro-sama = "0.4.6"
+neuro-sama = {version = "0.4.6", features = ["strip-trailing-zeroes"] }
 schemars = { version = "0.8", features = ["derive"] }
 serde = "1.0.215"
 tokio = { version = "1.42.0", features = ["rt", "macros", "sync", "time"] }

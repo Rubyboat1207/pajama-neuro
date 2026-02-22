@@ -2,6 +2,14 @@
 
 This is a WIP project that will allow for remote play of the game *Pajama Sam in "No need to hide when it's dark outside"* by the AI Neuro-Sama.
 
+## Installation Guide
+
+1. Go to where Pajama Sam is installed
+2. Enter the ScummVM_Windows folder
+3. Rename SDL2.dll to SDL2_orig.dll
+4. Put the replacement SDL2.dll from either the artifacts or a release into this folder
+5. Launch Pajama Sam as normal
+
 ## Todo List for programming:
 
 - [X] ScummVM Loads Mod

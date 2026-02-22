@@ -1,11 +1,14 @@
-use crate::rooms::bedroom::BEDROOM_DESCRIPTION;
+use crate::rooms::{bedroom::BEDROOM_DESCRIPTION, intro::INTRO_DESCRIPTION};
 
+#[derive(Debug)]
 pub struct ObjectDescription {
     pub id: i32,
     pub name: &'static str,
-    pub on_clicked: fn() -> Result<String, String>
+    pub on_clicked: fn() -> Result<String, String>,
+    pub click_offset: Option<(i32, i32)>
 }
 
+#[derive(Debug)]
 pub struct RoomDescription {
     pub id: i32,
     pub name: &'static str,
@@ -20,8 +23,10 @@ impl RoomDescription {
 }
 
 mod bedroom;
+mod intro;
 
 pub const ROOMS: &'static [RoomDescription] = &[
+    INTRO_DESCRIPTION,
     BEDROOM_DESCRIPTION
 ];
 

@@ -38,7 +38,7 @@ enum Action {
 static LAST_ROOM_ID: OnceLock<Arc<Mutex<i32>>> = OnceLock::new();
 
 fn check_room_update() -> Option<i32> {
-    let room_id = unsafe { ScummEngine::get().unwrap().get_current_room_id() };
+    let room_id = unsafe { ScummEngine::get()?.get_current_room_id() };
     let data = LAST_ROOM_ID.get_or_init(|| Arc::new(Mutex::new(-1)));
     let mut value = data.lock().unwrap();
 
@@ -63,7 +63,7 @@ fn get_room_contents() -> Result<String, GetRoomContentsErr> {
         .ok_or(GetRoomContentsErr::RoomNotFound)?
         .objects
     {
-        readout += &format!("{} which as an ID of {}", object.name, object.id);
+        readout += &format!("- {} which as an ID of {}\n", object.name, object.id);
     }
 
     Ok(readout)
@@ -134,7 +134,7 @@ impl neuro_sama::game::Game for PajamaSam {
                             .to_string(),
                     ))?;
 
-                objectData.click();
+                objectData.click(object_description.click_offset);
 
                 match (object_description.on_clicked)() {
                     Ok(val) => Ok(Some(val)),
@@ -149,17 +149,26 @@ impl neuro_sama::game::Game for PajamaSam {
 pub async fn init_game() {
     let (game2ws_tx, mut game2ws_rx) = mpsc::unbounded_channel();
     let game = Arc::new(PajamaSam(game2ws_tx));
-    game.initialize().unwrap();
+    let init_res = game.initialize();
+
+    if let Err(error) = init_res {
+        println!("Failed to initialize neuro integration. {:?}", error);
+        return;
+    }
 
     let mut ws =
-        tokio_tungstenite::connect_async(if let Ok(url) = std::env::var("NEURO_SDK_WS_URL") {
+        match tokio_tungstenite::connect_async(if let Ok(url) = std::env::var("NEURO_SDK_WS_URL") {
             url
         } else {
             "ws://127.0.0.1:8000".to_owned()
         })
-        .await
-        .unwrap()
-        .0;
+        .await {
+            Ok(res) => res.0,
+            Err(_) => {
+                println!("Failed to connect to Neuro Server. Retrys are not implemented yet. :/");
+                return;
+            },
+        };
 
     // is there a better way of doing this?
     let game2 = game.clone();

@@ -221,15 +221,17 @@ impl Actor {
 
 impl ObjectData {
     /// Simulates an SDL mouse click at the exact center of this object's hitbox.
-    pub fn click(&self) {
+    pub fn click(&self, offset: Option<(i32, i32)>) {
         // 1. Calculate the center of the hitbox
         let center_x = (self.x_pos + (self.width as i16 / 2)) as i32;
         let center_y = (self.y_pos + (self.height as i16 / 2)) as i32;
         let obj_nr = self.obj_nr;
 
+        let offset = offset.unwrap_or((0, 0));
+
         println!(
             "Simulating click on Object {} at X:{}, Y:{}",
-            obj_nr, center_x, center_y
+            obj_nr, center_x + offset.0, center_y + offset.1
         );
 
         // 2. Teleport the mouse to the object (Mouse Motion)
@@ -247,8 +249,8 @@ impl ObjectData {
                 state: SDL_PRESSED,
                 clicks: 1,
                 padding1: 0,
-                x: center_x,
-                y: center_y,
+                x: center_x + offset.0,
+                y: center_y + offset.1,
             },
         };
 

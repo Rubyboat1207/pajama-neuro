@@ -69,3 +69,7 @@ Basically just copy what's in ``src/rooms/bedroom.rs`` and then change it to mat
 ### Code Contribution
 
 I've never really managed an open source project before so I don't really know how many contributions I'll get but basically make sure you're nice, follow the existing conventions, and that your code actually compiles and does what it says it does before you make a PR.
+
+## Special Thanks
+
+This project is made using the [Rust Neuro-Sama Game API](https://github.com/chayleaf/rust-neuro-sama-game-api)

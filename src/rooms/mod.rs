@@ -1,7 +1,7 @@
+#![allow(warnings)]
 use crate::rooms::{
     back_door::BACK_DOOR_DESCRIPTION,
     base_of_the_tree::BASE_OF_THE_TREE_DESCRIPTION,
-    bedroom::BEDROOM_DESCRIPTION,
     by_the_well::BY_THE_WELL_DESCRIPTION,
     cavern::CAVERN_DESCRIPTION,
     cavern_with_bucket::CAVERN_WITH_BUCKET_DESCRIPTION,
@@ -27,7 +27,6 @@ use crate::rooms::{
     ig_logo::IG_LOGO_DESCRIPTION,
     inner_cavern::INNER_CAVERN_DESCRIPTION,
     interem_return_room::INTEREM_RETURN_ROOM_DESCRIPTION,
-    intro::INTRO_DESCRIPTION,
     inventory::INVENTORY_DESCRIPTION,
     junction::JUNCTION_DESCRIPTION,
     kitchen::KITCHEN_DESCRIPTION,

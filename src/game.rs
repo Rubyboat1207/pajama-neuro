@@ -7,6 +7,8 @@ const ROOM_INDEX_OFFSET: usize = 0x48B4;
 const NUM_ACTORS_OFFSET: usize = 0x27E5;
 const ACTORS_ARRAY_OFFSET: usize = 0x27E8;
 const OBJS_OFFSET: usize = 0x68;
+const ROOM_VARS_OFFSET: usize = 0x2800;
+const SCUMM_VARS_OFFSET: usize = 0x2804;
 
 // --- Actor Offsets ---
 const ACTOR_X_OFFSET: usize = 0x08;
@@ -148,6 +150,17 @@ impl ScummEngine {
             })
         }
     }
+
+    pub unsafe fn get_scumm_var(&self, index: usize) -> i32 {
+    unsafe {
+        let pointer_to_array = (self.base_address + SCUMM_VARS_OFFSET) as *const *const i32;
+        
+        let array_base = ptr::read_unaligned(pointer_to_array);
+        
+        let var_ptr = array_base.add(index);
+        ptr::read_unaligned(var_ptr)
+    }
+}
 }
 
 use crate::sdl::{
@@ -231,7 +244,9 @@ impl ObjectData {
 
         println!(
             "Simulating click on Object {} at X:{}, Y:{}",
-            obj_nr, center_x + offset.0, center_y + offset.1
+            obj_nr,
+            center_x + offset.0,
+            center_y + offset.1
         );
 
         // 2. Teleport the mouse to the object (Mouse Motion)

@@ -183,7 +183,7 @@ pub async fn init_game() {
     loop {
         tokio::select! {
             msg = game2ws_rx.recv() => {
-                println!("game2ws {msg:?}");
+                // println!("game2ws {msg:?}");
                 let Some(msg) = msg else {
                     break;
                 };
@@ -193,7 +193,7 @@ pub async fn init_game() {
                 }
             }
             msg = ws.next() => {
-                println!("ws2game {msg:?}");
+                // println!("ws2game {msg:?}");
                 let Some(msg) = msg else {
                     break;
                 };

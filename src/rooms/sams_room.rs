@@ -1,8 +1,8 @@
 use crate::rooms::{ObjectDescription, RoomDescription};
 
-pub(crate) const BEDROOM_DESCRIPTION: RoomDescription = RoomDescription {
+pub(crate) const SAMS_ROOM_DESCRIPTION: RoomDescription = RoomDescription {
     id: 2,
-    name: "Sam's Bedroom",
+    name: "Sam's Room",
     on_entered: || "".to_string(),
     objects: &[
         ObjectDescription {

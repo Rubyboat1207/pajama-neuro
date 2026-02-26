@@ -7,7 +7,7 @@ const ROOM_INDEX_OFFSET: usize = 0x48B4;
 const NUM_ACTORS_OFFSET: usize = 0x27E5;
 const ACTORS_ARRAY_OFFSET: usize = 0x27E8;
 const OBJS_OFFSET: usize = 0x68;
-const ROOM_VARS_OFFSET: usize = 0x2800;
+// const ROOM_VARS_OFFSET: usize = 0x2800;
 const SCUMM_VARS_OFFSET: usize = 0x2804;
 
 // --- Actor Offsets ---
@@ -151,6 +151,7 @@ impl ScummEngine {
         }
     }
 
+    #[allow(unused)]
     pub unsafe fn get_scumm_var(&self, index: usize) -> i32 {
     unsafe {
         let pointer_to_array = (self.base_address + SCUMM_VARS_OFFSET) as *const *const i32;

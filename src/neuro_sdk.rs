@@ -6,9 +6,9 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
     time::Duration,
 };
-use tokio::sync::mpsc;
+use tokio::sync::mpsc::{self, UnboundedSender};
 
-use crate::{game::ScummEngine, rooms::get_room_at};
+use crate::{ game::{engine::ScummEngine, events::init_hooks}, rooms::get_room_at};
 
 struct PajamaSam(mpsc::UnboundedSender<tungstenite::Message>);
 
@@ -145,8 +145,24 @@ impl neuro_sama::game::Game for PajamaSam {
     }
 }
 
+#[derive(Debug)]
+pub struct DialogLine {
+    pub offset_id: u32,
+    #[allow(unused)]
+    pub length: u32,
+    pub text: String,
+}
+
+pub static DIALOGUE_TX: OnceLock<UnboundedSender<DialogLine>> = OnceLock::new();
+
 #[tokio::main(flavor = "current_thread")]
 pub async fn init_game() {
+    let (dialogue_tx, mut dialogue_rx) = tokio::sync::mpsc::unbounded_channel();
+    DIALOGUE_TX.set(dialogue_tx).expect("Failed to set DIALOGUE_TX");
+
+    unsafe {
+        init_hooks();
+    }
     let (game2ws_tx, mut game2ws_rx) = mpsc::unbounded_channel();
     let game = Arc::new(PajamaSam(game2ws_tx));
     let init_res = game.initialize();
@@ -176,7 +192,7 @@ pub async fn init_game() {
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(5)).await;
-            send_context_if_room_updated(&game2);
+            // send_context_if_room_updated(&game2);
         }
     });
 
@@ -207,7 +223,12 @@ pub async fn init_game() {
                     continue;
                 }
             }
-
+            Some(dialogue) = dialogue_rx.recv() => {                
+                _ = game.context(
+                    format!("{} just said: '{}'", dialogue.get_speaker(), dialogue.text), 
+                    false
+                );
+            }
         }
     }
 }

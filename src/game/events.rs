@@ -1,9 +1,10 @@
 use minhook::MinHook;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 
-use crate::{neuro_sdk::{DIALOGUE_TX, DialogLine}};
+use crate::{game::engine::ScummEngine, neuro_sdk::{DIALOGUE_TX, DialogLine}};
 
 const ACTOR_TALK_OFFSET: usize = 0xC0C70;
+const CURSOR_COMMAND_OFFSET: usize = 0x004882d0 - 0x400000;
 
 type ActorTalkFn = unsafe extern "thiscall" fn(usize, *const u8);
 
@@ -47,6 +48,30 @@ unsafe extern "thiscall" fn on_actor_talk(this_ptr: usize, msg: *const u8) {
     }
 }
 
+type CursorCommandFn = unsafe extern "thiscall" fn(usize);
+
+static mut ORIGINAL_CURSOR_COMMAND: Option<CursorCommandFn> = None;
+
+unsafe extern "thiscall" fn on_cursor_command(this_ptr: usize) {
+    println!("Cursor command intercepted!");
+
+    let subOp = unsafe { ScummEngine::get().unwrap().get_script_byte() };
+
+    match subOp {
+        0x86 => println!("Cursor command: Cursor On"),
+        0x87 => println!("Cursor command: Cursor Off"),
+        0x8B => println!("UserPut on"),
+        0x8C => println!("UserPut off"),
+        _ => (),
+    };
+
+    unsafe {
+        if let Some(original) = ORIGINAL_CURSOR_COMMAND {
+            original(this_ptr);
+        }
+    }
+}
+
 pub unsafe fn init_hooks() {
     unsafe {
         let module_base = GetModuleHandleW(std::ptr::null()) as usize;
@@ -57,8 +82,15 @@ pub unsafe fn init_hooks() {
 
         ORIGINAL_ACTOR_TALK = Some(std::mem::transmute(trampoline_ptr));
 
+        let cursor_func_addr = module_base + CURSOR_COMMAND_OFFSET;
+        let cursor_trampoline_ptr = MinHook::create_hook(cursor_func_addr as _, on_cursor_command as _)
+            .expect("Failed to create hook");
+
+        ORIGINAL_CURSOR_COMMAND = Some(std::mem::transmute(cursor_trampoline_ptr));
+
         MinHook::enable_all_hooks().expect("Failed to enable hooks");
 
         println!("Successfully hooked actorTalk at {:#X}", func_addr);
+        println!("Successfully hooked cursorCommand at {:#X}", cursor_func_addr);
     }
 }

@@ -12,6 +12,10 @@ const SCUMM_VARS_OFFSET: usize = 0x2804;
 const READ_ARRAY_OFFSET: usize = 0x77B60;
 type ReadArrayHEFn =
     unsafe extern "thiscall" fn(this: usize, array_id: i32, idx2: i32, idx1: i32) -> i32;
+const CURSOR_STATE_OFFSET: usize = 0x70b2;
+const SCRIPT_POINTER_OFFSET: usize = 0x5b30;
+const REFRESH_SCRIPT_POINTER_OFFSET: usize = 0x42f810 - 0x400000;
+type RefreshScriptPointerFn = unsafe extern "thiscall" fn(this: usize);
 
 // --- Actor Offsets ---
 const ACTOR_X_OFFSET: usize = 0x08;
@@ -142,6 +146,11 @@ impl ScummEngine {
         unsafe { ptr::read_unaligned(room_id_ptr) }
     }
 
+    pub fn get_cursor_state(&self) -> i8 {
+        let cursor_state_ptr = (self.base_address + CURSOR_STATE_OFFSET) as *const i8;
+        unsafe { ptr::read_unaligned(cursor_state_ptr) }
+    }
+
     #[allow(unused)]
     pub unsafe fn get_num_actors(&self) -> u8 {
         let num_actors_ptr = (self.base_address + NUM_ACTORS_OFFSET) as *const u8;
@@ -184,6 +193,31 @@ impl ScummEngine {
 
             let var_ptr = array_base.add(index);
             ptr::read_unaligned(var_ptr)
+        }
+    }
+
+    pub fn get_script_byte(&self) -> u8 {
+        self.refresh_script_pointer();
+        unsafe {
+            let script_pointer_field_ptr = (self.base_address + SCRIPT_POINTER_OFFSET) as *const *const u8;
+            let actual_script_ptr = ptr::read_unaligned(script_pointer_field_ptr);
+            ptr::read_unaligned(actual_script_ptr)
+        }
+    }
+
+    pub fn refresh_script_pointer(&self) {
+        unsafe {
+            let module_handle = GetModuleHandleW(ptr::null());
+            if module_handle.is_null() {
+                return;
+            }
+            let module_base = module_handle as usize;
+
+            let func_addr = module_base + REFRESH_SCRIPT_POINTER_OFFSET;
+            let refresh_script_pointer_native: RefreshScriptPointerFn =
+                std::mem::transmute(func_addr);
+
+            refresh_script_pointer_native(self.base_address);
         }
     }
 }

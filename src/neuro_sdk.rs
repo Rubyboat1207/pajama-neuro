@@ -187,7 +187,7 @@ pub async fn init_game() {
         };
 
     // is there a better way of doing this?
-    let game2 = game.clone();
+    // let game2 = game.clone();
 
     tokio::spawn(async move {
         loop {

@@ -9,6 +9,9 @@ const ACTORS_ARRAY_OFFSET: usize = 0x27E8;
 const OBJS_OFFSET: usize = 0x68;
 // const ROOM_VARS_OFFSET: usize = 0x2800;
 const SCUMM_VARS_OFFSET: usize = 0x2804;
+const READ_ARRAY_OFFSET: usize = 0x77B60;
+type ReadArrayHEFn =
+    unsafe extern "thiscall" fn(this: usize, array_id: i32, idx2: i32, idx1: i32) -> i32;
 
 // --- Actor Offsets ---
 const ACTOR_X_OFFSET: usize = 0x08;
@@ -77,6 +80,28 @@ impl ScummEngine {
 
             Some(obj_data)
         }
+    }
+
+    pub unsafe fn get_array_val_2d(&self, array_id: i32, idx2: i32, idx1: i32) -> Option<i32> {
+        unsafe {
+            let module_handle = GetModuleHandleW(std::ptr::null());
+            if module_handle.is_null() {
+                return None;
+            }
+            let module_base = module_handle as usize;
+
+            let func_addr = module_base + READ_ARRAY_OFFSET;
+            let read_array_native: ReadArrayHEFn = std::mem::transmute(func_addr);
+
+            let result = read_array_native(self.base_address, array_id, idx2, idx1);
+
+            Some(result)
+        }
+    }
+
+    #[allow(unused)]
+    pub unsafe fn get_array_val(&self, array_id: i32, index: i32) -> Option<i32> {
+        unsafe { self.get_array_val_2d(array_id, 0, index) }
     }
 
     // maybe this should be marked unsafe, but to me I don't think this would ever cause unsafe accesses under normal circumstances.
@@ -151,17 +176,16 @@ impl ScummEngine {
         }
     }
 
-    #[allow(unused)]
     pub unsafe fn get_scumm_var(&self, index: usize) -> i32 {
-    unsafe {
-        let pointer_to_array = (self.base_address + SCUMM_VARS_OFFSET) as *const *const i32;
-        
-        let array_base = ptr::read_unaligned(pointer_to_array);
-        
-        let var_ptr = array_base.add(index);
-        ptr::read_unaligned(var_ptr)
+        unsafe {
+            let pointer_to_array = (self.base_address + SCUMM_VARS_OFFSET) as *const *const i32;
+
+            let array_base = ptr::read_unaligned(pointer_to_array);
+
+            let var_ptr = array_base.add(index);
+            ptr::read_unaligned(var_ptr)
+        }
     }
-}
 }
 
 use crate::sdl::{
@@ -290,6 +314,31 @@ impl ObjectData {
         unsafe {
             SDL_PushEvent(&mut mouse_down);
             SDL_PushEvent(&mut mouse_up);
+        }
+    }
+}
+
+pub trait PajamaSamGame {
+    fn has_item(&self, item_id: i32) -> bool;
+}
+
+impl PajamaSamGame for ScummEngine {
+    fn has_item(&self, item_id: i32) -> bool {
+        unsafe {
+            let total_items = self.get_scumm_var(245);
+            if total_items <= 0 {
+                return false; 
+            }
+
+            for current_slot in 1..=total_items {
+                if let Some(stored_item_id) = self.get_array_val_2d(247, current_slot, 8) {
+                    if stored_item_id == item_id {
+                        return true;
+                    }
+                }
+            }
+
+            false
         }
     }
 }

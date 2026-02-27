@@ -15,7 +15,7 @@ This is a WIP project that will allow for remote play of the game *Pajama Sam in
 - [X] ScummVM Loads Mod
 - [X] Mod can see what room we're currently in
 - [X] Mod can affect the game
-- [ ] Mod knows what's in Sam's inventory
+- [X] Mod knows what's in Sam's inventory
 - [X] Mod knows what actors are in each room
 - [X] List of actions are available for what Neuro can interact with
 - [ ] Mod knows the state of the room

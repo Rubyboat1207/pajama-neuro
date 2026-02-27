@@ -1,9 +1,9 @@
 use minhook::MinHook;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 
-use crate::neuro_sdk::{DIALOGUE_TX, DialogLine};
+use crate::{neuro_sdk::{DIALOGUE_TX, DialogLine}};
 
-const ACTOR_TALK_OFFSET: usize = 0x000C0C70;
+const ACTOR_TALK_OFFSET: usize = 0xC0C70;
 
 type ActorTalkFn = unsafe extern "thiscall" fn(usize, *const u8);
 

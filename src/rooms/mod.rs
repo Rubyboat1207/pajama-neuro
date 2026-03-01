@@ -70,27 +70,6 @@ use crate::rooms::{
     y_intersection_mine_cart_room::Y_INTERSECTION_MINE_CART_ROOM_DESCRIPTION,
 };
 
-#[derive(Debug)]
-pub struct ObjectDescription {
-    pub id: i32,
-    pub name: &'static str,
-    pub on_clicked: fn() -> Result<String, String>,
-    pub click_offset: Option<(i32, i32)>
-}
-
-#[derive(Debug)]
-pub struct RoomDescription {
-    pub id: i32,
-    pub name: &'static str,
-    pub on_entered: fn() -> String,
-    pub objects: &'static [ObjectDescription]
-}
-
-impl RoomDescription {
-    pub fn get_object(&self, id: i32) -> Option<&'static ObjectDescription> {
-        self.objects.iter().find(|item| item.id == id)
-    }
-}
 
 pub(crate) mod back_door;
 pub(crate) mod base_of_the_tree;
@@ -141,7 +120,6 @@ pub(crate) mod potion_table;
 pub(crate) mod room_full_of_doors;
 pub(crate) mod room_full_of_doors_2;
 pub(crate) mod rooms;
-pub(crate) mod sams_room;
 pub(crate) mod saveload;
 pub(crate) mod scheme;
 pub(crate) mod shack_interior;
@@ -160,6 +138,7 @@ pub(crate) mod tic_tac_toe_room;
 pub(crate) mod tik_tac_toe;
 pub(crate) mod wild_gold_room;
 pub(crate) mod y_intersection_mine_cart_room;
+pub(crate) mod samsroom;
 
 pub const ROOMS: &'static [RoomDescription] = &[
     HE_LOGO_DESCRIPTION,
@@ -232,6 +211,140 @@ pub const ROOMS: &'static [RoomDescription] = &[
     SAVELOAD_DESCRIPTION
 ];
 
+use futures_util::future::Either;
+
+use crate::game::engine::ScummEngine;
+
+#[derive(Debug)]
+pub struct ObjectDescription {
+    pub id: i32,
+    pub name: &'static str,
+    on_clicked: Either<fn() -> Result<String, String>, &'static str>,
+    pub click_offset: Option<(i32, i32)>,
+}
+
+impl ObjectDescription {
+    const fn new_with_offset(
+        id: i32,
+        name: &'static str,
+        on_clicked: fn() -> Result<String, String>,
+        click_offset: Option<(i32, i32)>,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            on_clicked: Either::Left(on_clicked),
+            click_offset,
+        }
+    }
+
+    const fn new(id: i32, name: &'static str, on_clicked: fn() -> Result<String, String>) -> Self {
+        Self {
+            id,
+            name,
+            on_clicked: Either::Left(on_clicked),
+            click_offset: None,
+        }
+    }
+
+    const fn static_response(id: i32, name: &'static str, response: &'static str) -> Self {
+        Self {
+            id,
+            name,
+            on_clicked: Either::Right(response),
+            click_offset: None,
+        }
+    }
+
+    const fn placeholder(id: i32, name: &'static str) -> Self {
+        Self {
+            id,
+            name,
+            on_clicked: Either::Right("Not implemented yet. Try another object"),
+            click_offset: None,
+        }
+    }
+
+    pub fn click(&self, offset: Option<(i32, i32)>) -> Result<String, String> {
+        let engine = unsafe { ScummEngine::get().ok_or("Engine not initialized".to_string()) }?;
+        let objectData = engine
+            .get_room_object(self.id as usize)
+            .ok_or("Invalid Object".to_string())?;
+
+        
+        match &self.on_clicked {
+            Either::Left(func) => func(),
+            Either::Right(response) => Ok(response.to_string()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RoomDescription {
+    pub id: i32,
+    pub name: &'static str,
+    pub on_entered: fn() -> String,
+    pub objects: &'static [ObjectDescription],
+    pub silent: bool,
+}
+
+impl RoomDescription {
+    pub fn get_object(&self, id: i32) -> Option<&'static ObjectDescription> {
+        self.objects.iter().find(|item| item.id == id)
+    }
+
+    pub const fn basic(id: i32, name: &'static str, objects: &'static [ObjectDescription]) -> Self {
+        Self {
+            id,
+            name,
+            on_entered: || "".to_string(),
+            objects,
+            silent: false
+        }
+    }
+
+    pub const fn placeholder(id: i32, name: &'static str) -> Self {
+        Self {
+            id,
+            name,
+            on_entered: || "".to_string(),
+            objects: &[],
+            silent: false
+        }
+    }
+
+    pub const fn silent(id: i32) -> Self {
+        Self {
+            id,
+            name: "",
+            on_entered: || "".to_string(),
+            objects: &[],
+            silent: true
+        }
+    }
+}
+
+pub const ROOMS: &'static [RoomDescription] = &[];
+
 pub fn get_room_at(id: i32) -> Option<&'static RoomDescription> {
     ROOMS.iter().find(|item| item.id == id)
+}
+
+enum GetRoomContentsErr {
+    EngineNotYetLoaded,
+    RoomNotFound,
+}
+
+fn get_room_contents() -> Result<String, GetRoomContentsErr> {
+    let mut readout = "".to_string();
+    let engine = unsafe { ScummEngine::get() }.ok_or(GetRoomContentsErr::EngineNotYetLoaded)?;
+
+    for object in get_room_at(engine.get_current_room_id())
+        .ok_or(GetRoomContentsErr::RoomNotFound)?
+        .objects
+    {
+        readout += &format!("- {} which as an ID of {}\n", object.name, object.id);
+    }
+
+    Ok(readout)
 }

@@ -8,7 +8,10 @@ use std::{
 };
 use tokio::sync::mpsc::{self, UnboundedSender};
 
-use crate::{ game::{engine::ScummEngine, events::init_hooks}, rooms::get_room_at};
+use crate::{
+    game::{engine::ScummEngine, events::init_hooks},
+    rooms::get_room_at,
+};
 
 struct PajamaSam(mpsc::UnboundedSender<tungstenite::Message>);
 
@@ -35,68 +38,6 @@ enum Action {
     ClickObject(ClickObject),
 }
 
-static LAST_ROOM_ID: OnceLock<Arc<Mutex<i32>>> = OnceLock::new();
-
-fn check_room_update() -> Option<i32> {
-    let room_id = unsafe { ScummEngine::get()?.get_current_room_id() };
-    let data = LAST_ROOM_ID.get_or_init(|| Arc::new(Mutex::new(-1)));
-    let mut value = data.lock().unwrap();
-
-    if room_id != *value {
-        *value = room_id;
-        Some(room_id) // Return the new ID
-    } else {
-        None
-    }
-}
-
-enum GetRoomContentsErr {
-    EngineNotYetLoaded,
-    RoomNotFound,
-}
-
-fn get_room_contents() -> Result<String, GetRoomContentsErr> {
-    let mut readout = "".to_string();
-    let engine = unsafe { ScummEngine::get() }.ok_or(GetRoomContentsErr::EngineNotYetLoaded)?;
-
-    for object in get_room_at(engine.get_current_room_id())
-        .ok_or(GetRoomContentsErr::RoomNotFound)?
-        .objects
-    {
-        readout += &format!("- {} which as an ID of {}\n", object.name, object.id);
-    }
-
-    Ok(readout)
-}
-
-fn send_context_if_room_updated(game: &PajamaSam) {
-    let _ = match check_room_update() {
-        Some(new_id) => game.context(
-            format!(
-                "You've moved into {}. {} Inside this room are the following:\n {}",
-                get_room_name(new_id),
-                match get_room_at(new_id) {
-                    Some(room) => (room.on_entered)(),
-                    None => "".to_string(),
-                },
-                get_room_contents().unwrap_or("Its empty or unmapped.".to_string())
-            ),
-            false,
-        ),
-        None => return,
-    };
-}
-
-fn get_room_name(id: i32) -> String {
-    match get_room_at(id) {
-        Some(room) => room.name.to_string(),
-        None => format!(
-            "An unknown room with ID {}. Someone tell Rubyboat there's a problem with their mod.",
-            id
-        ),
-    }
-}
-
 impl neuro_sama::game::Game for PajamaSam {
     const NAME: &'static str = "Pajama Sam";
     type Actions<'a> = Action;
@@ -105,7 +46,7 @@ impl neuro_sama::game::Game for PajamaSam {
     }
 
     fn reregister_actions(&self) {
-        self.register_actions::<Action>().unwrap();
+        return;
     }
 
     fn handle_action<'a>(
@@ -116,30 +57,20 @@ impl neuro_sama::game::Game for PajamaSam {
         Option<impl 'static + Into<std::borrow::Cow<'static, str>>>,
     > {
         let engine = unsafe { ScummEngine::get().unwrap() };
-        send_context_if_room_updated(self);
 
         match action {
             Action::GetRoomId(_) => {
                 Ok::<_, Option<String>>(Some(engine.get_current_room_id().to_string()))
             }
             Action::ClickObject(object) => {
-                let objectData = engine.get_room_object(object.objectId)
-                    .ok_or(Some("Invalid Object".to_string()))?;
+                let room = get_room_at(engine.get_current_room_id())
+                    .ok_or(Some("Room was invalid".to_string()))?;
 
-                let object_description = get_room_at(engine.get_current_room_id())
-                    .ok_or(Some("This room has not been mapped yet.".to_string()))?
-                    .get_object(object.objectId as i32)
-                    .ok_or(Some(
-                        "Object has not been mapped yet or is not intended to be selected"
-                            .to_string(),
-                    ))?;
-
-                objectData.click(object_description.click_offset);
-
-                match (object_description.on_clicked)() {
-                    Ok(val) => Ok(Some(val)),
-                    Err(val) => Err(Some(val)),
-                }
+                room.get_object(object.objectId as i32)
+                    .ok_or(Some("Object was invalid".to_string()))?
+                    .click(None)
+                    .map(Some)
+                    .map_err(|e| Some(e))
             }
         }
     }
@@ -158,7 +89,9 @@ pub static DIALOGUE_TX: OnceLock<UnboundedSender<DialogLine>> = OnceLock::new();
 #[tokio::main(flavor = "current_thread")]
 pub async fn init_game() {
     let (dialogue_tx, mut dialogue_rx) = tokio::sync::mpsc::unbounded_channel();
-    DIALOGUE_TX.set(dialogue_tx).expect("Failed to set DIALOGUE_TX");
+    DIALOGUE_TX
+        .set(dialogue_tx)
+        .expect("Failed to set DIALOGUE_TX");
 
     unsafe {
         init_hooks();
@@ -178,12 +111,13 @@ pub async fn init_game() {
         } else {
             "ws://127.0.0.1:8000".to_owned()
         })
-        .await {
+        .await
+        {
             Ok(res) => res.0,
             Err(_) => {
                 println!("Failed to connect to Neuro Server. Retrys are not implemented yet. :/");
                 return;
-            },
+            }
         };
 
     // is there a better way of doing this?
@@ -223,9 +157,9 @@ pub async fn init_game() {
                     continue;
                 }
             }
-            Some(dialogue) = dialogue_rx.recv() => {                
+            Some(dialogue) = dialogue_rx.recv() => {
                 _ = game.context(
-                    format!("{} just said: '{}'", dialogue.get_speaker(), dialogue.text), 
+                    format!("{} just said: '{}'", dialogue.get_speaker(), dialogue.text),
                     false
                 );
             }

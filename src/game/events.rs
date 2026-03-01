@@ -5,6 +5,7 @@ use crate::{game::engine::ScummEngine, neuro_sdk::{DIALOGUE_TX, DialogLine}};
 
 const ACTOR_TALK_OFFSET: usize = 0xC0C70;
 const CURSOR_COMMAND_OFFSET: usize = 0x004882d0 - 0x400000;
+const START_SCENE_OFFSET: usize = 0x0052d040 - 0x400000;
 
 type ActorTalkFn = unsafe extern "thiscall" fn(usize, *const u8);
 
@@ -72,6 +73,20 @@ unsafe extern "thiscall" fn on_cursor_command(this_ptr: usize) {
     }
 }
 
+// void ScummEngine::startScene(int room, Actor *a, int objectNr)
+type StartSceneFn = unsafe extern "thiscall" fn(usize, isize, usize, isize);
+
+static mut ORIGINAL_START_SCENE: Option<StartSceneFn> = None;
+unsafe extern "thiscall" fn on_start_scene(this_ptr: usize, room: isize, a: usize, objectNr: isize) {
+    println!("StartScene called with room {}, actor {}, object {}", room, a, objectNr);
+
+    unsafe {
+        if let Some(original) = ORIGINAL_START_SCENE {
+            original(this_ptr, room, a, objectNr);
+        }
+    }
+}
+
 pub unsafe fn init_hooks() {
     unsafe {
         let module_base = GetModuleHandleW(std::ptr::null()) as usize;
@@ -88,9 +103,15 @@ pub unsafe fn init_hooks() {
 
         ORIGINAL_CURSOR_COMMAND = Some(std::mem::transmute(cursor_trampoline_ptr));
 
+        let start_scene_addr = module_base + START_SCENE_OFFSET;
+        let start_scene_trampoline_ptr = MinHook::create_hook(start_scene_addr as _, on_start_scene as _)
+            .expect("Failed to create hook");
+        ORIGINAL_START_SCENE = Some(std::mem::transmute(start_scene_trampoline_ptr));
+
         MinHook::enable_all_hooks().expect("Failed to enable hooks");
 
         println!("Successfully hooked actorTalk at {:#X}", func_addr);
         println!("Successfully hooked cursorCommand at {:#X}", cursor_func_addr);
+        println!("Successfully hooked startScene at {:#X}", module_base + START_SCENE_OFFSET);
     }
 }

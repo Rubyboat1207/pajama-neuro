@@ -146,6 +146,7 @@ impl ScummEngine {
         unsafe { ptr::read_unaligned(room_id_ptr) }
     }
 
+    #[allow(unused)]
     pub fn get_cursor_state(&self) -> i8 {
         let cursor_state_ptr = (self.base_address + CURSOR_STATE_OFFSET) as *const i8;
         unsafe { ptr::read_unaligned(cursor_state_ptr) }
